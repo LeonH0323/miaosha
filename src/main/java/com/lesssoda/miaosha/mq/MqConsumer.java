@@ -37,7 +37,7 @@ public class MqConsumer {
 
     @PostConstruct
     public void init() throws MQClientException {
-        // 做mq producer的初始化I
+        // 做mq producer的初始化
         consumer = new DefaultMQPushConsumer("stock_consumer_group");
         consumer.setNamesrvAddr(nameAddr);
         consumer.subscribe(topicName, "*");
