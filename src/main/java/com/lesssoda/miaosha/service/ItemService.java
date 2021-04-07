@@ -27,7 +27,13 @@ public interface ItemService {
     // 库存扣减
     boolean decreaseStock(Integer itemId, Integer amount);
 
+    // 库存回补
+    boolean increaseStock(Integer itemId, Integer amount);
+
     // 商品销量增加
     void increaseSales(Integer itemId, Integer amount);
+
+    // 异步更新库存
+    boolean asyncDecreaseStock(Integer itemId, Integer amount);
 
 }

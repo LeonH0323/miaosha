@@ -2,6 +2,7 @@ package com.lesssoda.miaosha.controller;
 
 import com.lesssoda.miaosha.error.BusinessException;
 import com.lesssoda.miaosha.error.EmBusinessError;
+import com.lesssoda.miaosha.mq.MqProducer;
 import com.lesssoda.miaosha.response.CommonReturnType;
 import com.lesssoda.miaosha.service.Model.OrderModel;
 import com.lesssoda.miaosha.service.Model.UserModel;
@@ -31,6 +32,9 @@ public class OrderController extends BaseController{
     @Autowired
     private HttpServletRequest httpServletRequest;
 
+    @Autowired
+    private MqProducer mqProducer;
+
     @RequestMapping(value = "/createorder",method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
     public CommonReturnType createOrder(@RequestParam(name = "itemId")Integer itemId,
                                         @RequestParam(name = "amount")Integer amount,
@@ -48,7 +52,11 @@ public class OrderController extends BaseController{
             throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能下单");
 //        UserModel login_user = (UserModel) httpServletRequest.getSession().getAttribute("LOGIN_USER");
 
-        OrderModel orderModel = orderService.createOrder(userModel.getId(), promoId, itemId, amount);
+//        OrderModel orderModel = orderService.createOrder(userModel.getId(), promoId, itemId, amount);
+
+        if (!mqProducer.transactionAsyncReduceStock(userModel.getId(), promoId, itemId, amount)){
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR, "下单失败");
+        }
 
         return CommonReturnType.create(null);
     }
