@@ -8,6 +8,7 @@ import com.lesssoda.miaosha.service.ItemService;
 import com.lesssoda.miaosha.service.Model.OrderModel;
 import com.lesssoda.miaosha.service.Model.UserModel;
 import com.lesssoda.miaosha.service.OrderService;
+import com.lesssoda.miaosha.service.PromoService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -38,6 +39,29 @@ public class OrderController extends BaseController{
 
     @Autowired
     private ItemService itemService;
+
+    @Autowired
+    private PromoService promoService;
+
+    @RequestMapping(value = "generatetoken", method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
+    public CommonReturnType generateToken(@RequestParam(name = "itemId")Integer itemId,
+                                          @RequestParam(name = "promoId")Integer promoId) throws BusinessException {
+        // 根据token获取用户信息
+        String token = httpServletRequest.getParameterMap().get("token")[0];
+        if(StringUtils.isEmpty(token)){
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能下单");
+        }
+        // 获取用户的登陆信息
+        UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
+        if(userModel == null){
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能下单");
+        }
+        // 获取秒杀访问令牌
+        String promoToken = promoService.generateSecondKillToken(promoId, itemId, userModel.getId());
+        if (promoToken == null)
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "生成令牌失败");
+        return CommonReturnType.create(promoToken);
+    }
 
     @RequestMapping(value = "/createorder",method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
     public CommonReturnType createOrder(@RequestParam(name = "itemId")Integer itemId,
