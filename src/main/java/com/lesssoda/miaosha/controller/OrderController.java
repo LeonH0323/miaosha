@@ -66,18 +66,30 @@ public class OrderController extends BaseController{
     @RequestMapping(value = "/createorder",method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
     public CommonReturnType createOrder(@RequestParam(name = "itemId")Integer itemId,
                                         @RequestParam(name = "amount")Integer amount,
-                                        @RequestParam(name = "promoId", required = false)Integer promoId) throws BusinessException {
+                                        @RequestParam(name = "promoId", required = false)Integer promoId,
+                                        @RequestParam(name = "promoToken", required = false)String promoToken) throws BusinessException {
 
-//        Boolean is_login = (Boolean) httpServletRequest.getSession().getAttribute("IS_LOGIN");
+
+
 
         String token = httpServletRequest.getParameterMap().get("token")[0];
         if (StringUtils.isEmpty(token))
             throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能下单");
-
+        // 获取用户的登录信息
         UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
-
         if (userModel == null)
             throw new BusinessException(EmBusinessError.USER_NOT_LOGIN,"用户还未登陆，不能下单");
+
+        // 校验秒杀令牌是否正确
+        if (promoId != null) {
+            String inRedisPromoToken = (String)redisTemplate.opsForValue().get("promo_token_" + promoId + "_userid_" + userModel.getId() + "_itemid_" + itemId);
+            if (inRedisPromoToken == null)
+                throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "秒杀令牌校验失败");
+
+            if (!StringUtils.equals(inRedisPromoToken, promoToken))
+                throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, "秒杀令牌校验失败");
+        }
+
 //        UserModel login_user = (UserModel) httpServletRequest.getSession().getAttribute("LOGIN_USER");
 
 //        OrderModel orderModel = orderService.createOrder(userModel.getId(), promoId, itemId, amount);

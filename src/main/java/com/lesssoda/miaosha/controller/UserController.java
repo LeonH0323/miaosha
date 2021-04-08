@@ -52,11 +52,11 @@ public class UserController extends BaseController{
         // 用户登录服务，用来校验用户登录是否合法
         UserModel userModel = userService.validateLogin(telphone, this.EncodeByMd5(password));
 
-        // 用户邓丽验证成功后将对应的登录信息和登录凭证一起存入redis中
+        // 用户登录验证成功后将对应的登录信息和登录凭证一起存入redis中
 
         //生成登录凭证token， UUID
         String uuidToken = UUID.randomUUID().toString();
-        uuidToken.replace("-","");
+        uuidToken.replaceAll("-","");
 
         // 建立token和用户登录态之间的联系
         redisTemplate.opsForValue().set(uuidToken, userModel);

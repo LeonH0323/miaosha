@@ -98,8 +98,8 @@ public class PromoServiceImpl implements PromoService {
         // 生成token并且存入redis内并给一个5分钟的有效期
         String token = UUID.randomUUID().toString().replace("-", "");
 
-        redisTemplate.opsForValue().set("promo_token_" + promoId, token);
-        redisTemplate.expire("promo_token_" + promoId, 5, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set("promo_token_" + promoId + "_userid_" + userId + "_itemid_" + itemId, token);
+        redisTemplate.expire("promo_token_" + promoId + "_userid_" + userId + "_itemid_" + itemId, 5, TimeUnit.MINUTES);
 
         return token;
     }
