@@ -1,5 +1,6 @@
 package com.lesssoda.miaosha.controller;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.lesssoda.miaosha.error.BusinessException;
 import com.lesssoda.miaosha.error.EmBusinessError;
 import com.lesssoda.miaosha.mq.MqProducer;
@@ -53,9 +54,13 @@ public class OrderController extends BaseController{
 
     private ExecutorService executorService;
 
+    private RateLimiter orderCreateRateLimiter;
+
     @PostConstruct
     public void init(){
         executorService = Executors.newFixedThreadPool(20);
+
+        orderCreateRateLimiter = RateLimiter.create(100);
     }
 
 
@@ -118,6 +123,9 @@ public class OrderController extends BaseController{
                                         @RequestParam(name = "promoToken", required = false)String promoToken) throws BusinessException {
 
 
+
+        if (!orderCreateRateLimiter.tryAcquire())
+            throw new BusinessException(EmBusinessError.RATELIMIT);
 
 
         String token = httpServletRequest.getParameterMap().get("token")[0];
