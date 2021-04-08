@@ -16,9 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * @author Lee
@@ -38,6 +39,8 @@ public class PromoServiceImpl implements PromoService {
 
     @Autowired
     private UserService userService;
+
+
 
 
     @Override
@@ -76,7 +79,12 @@ public class PromoServiceImpl implements PromoService {
     }
 
     @Override
-    public String generateSecondKillToken(Integer promoId, Integer itemId, Integer userId) throws BusinessException {
+    public String generateSecondKillToken(Integer promoId, Integer itemId, Integer userId){
+
+        // 判断是否库存售罄，若对应的售罄key存在，则直接返回下单失败
+        if (redisTemplate.hasKey("promo_item_stock_invalid_" + itemId))
+            return null;
+
         PromoDO promoDO = promoDOMapper.selectByPrimaryKey(promoId);
         PromoModel promoModel = convertFromDataObject(promoDO);
         if (promoModel == null)

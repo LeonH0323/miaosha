@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
+import java.util.concurrent.*;
 
 /**
  * @author Lee
@@ -42,6 +44,13 @@ public class OrderController extends BaseController{
 
     @Autowired
     private PromoService promoService;
+
+    private ExecutorService executorService;
+
+    @PostConstruct
+    public void init(){
+        executorService = Executors.newFixedThreadPool(20);
+    }
 
     @RequestMapping(value = "generatetoken", method = {RequestMethod.POST},consumes={CONTENT_TYPE_FORMED})
     public CommonReturnType generateToken(@RequestParam(name = "itemId")Integer itemId,
@@ -94,18 +103,31 @@ public class OrderController extends BaseController{
 
 //        OrderModel orderModel = orderService.createOrder(userModel.getId(), promoId, itemId, amount);
 
-        // 判断是否库存售罄，若对应的售罄key存在，则直接返回下单失败
-        if (redisTemplate.hasKey("promo_item_stock_invalid_" + itemId)) {
-            throw new BusinessException(EmBusinessError.STOCK_NOT_ENOUGH);
+        // 同步调用线程池的submit方法
+        // 拥塞窗口为20的等待队列，用来队列化泄洪
+        Future<Object> future = executorService.submit(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                // 加入库存流水init状态
+                String stockLogId = itemService.initStockLog(itemId, amount);
+
+                // 再去完成对应的下单事务性消息机制
+                if (!mqProducer.transactionAsyncReduceStock(userModel.getId(), promoId, itemId, amount, stockLogId)) {
+                    throw new BusinessException(EmBusinessError.UNKNOWN_ERROR, "下单失败");
+                }
+                return null;
+            }
+        });
+
+
+        try {
+            future.get();
+        } catch (InterruptedException e) {
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR);
+        } catch (ExecutionException e) {
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR);
         }
 
-        // 加入库存流水init状态
-        String stockLogId = itemService.initStockLog(itemId, amount);
-
-        // 再去完成对应的下单事务性消息机制
-        if (!mqProducer.transactionAsyncReduceStock(userModel.getId(), promoId, itemId, amount, stockLogId)){
-            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR, "下单失败");
-        }
 
         return CommonReturnType.create(null);
     }
