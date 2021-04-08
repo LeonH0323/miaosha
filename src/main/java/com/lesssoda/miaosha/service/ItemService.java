@@ -36,4 +36,6 @@ public interface ItemService {
     // 异步更新库存
     boolean asyncDecreaseStock(Integer itemId, Integer amount);
 
+    // 初始化库存流水
+    String initStockLog(Integer itemId, Integer amount);
 }

@@ -2,8 +2,10 @@ package com.lesssoda.miaosha.service.Impl;
 
 import com.lesssoda.miaosha.dao.ItemDOMapper;
 import com.lesssoda.miaosha.dao.ItemStockDOMapper;
+import com.lesssoda.miaosha.dao.StockLogDOMapper;
 import com.lesssoda.miaosha.dataobject.ItemDO;
 import com.lesssoda.miaosha.dataobject.ItemStockDO;
+import com.lesssoda.miaosha.dataobject.StockLogDO;
 import com.lesssoda.miaosha.error.BusinessException;
 import com.lesssoda.miaosha.error.EmBusinessError;
 import com.lesssoda.miaosha.mq.MqProducer;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -51,6 +54,9 @@ public class ItemServiceImpl implements ItemService {
 
     @Autowired
     private MqProducer mqProducer;
+
+    @Autowired
+    private StockLogDOMapper stockLogDOMapper;
 
     @Override
     @Transactional
@@ -127,11 +133,11 @@ public class ItemServiceImpl implements ItemService {
 
         // redis操作
         Long result = redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, amount.intValue() * -1);
-        if (result >= 0){
-//            if(!mqProducer.asyncReduceStock(itemId, amount)){
-//                redisTemplate.opsForValue().increment("promo_item_stock_" + itemId, amount.intValue());
-//                return false;
-//            }
+        if (result > 0){
+            return true;
+        }else if (result == 0){
+            //库存已售罄标识
+            redisTemplate.opsForValue().set("promo_item_stock_invalid_" + itemId, "true");
             return true;
         }else{
             increaseStock(itemId, amount);
@@ -155,6 +161,21 @@ public class ItemServiceImpl implements ItemService {
     public boolean asyncDecreaseStock(Integer itemId, Integer amount) {
         Boolean mqResult = mqProducer.asyncReduceStock(itemId, amount);
         return mqResult;
+    }
+
+    // 初始化订单流水
+    @Override
+    @Transactional
+    public String initStockLog(Integer itemId, Integer amount) {
+        StockLogDO stockLogDO = new StockLogDO();
+        stockLogDO.setAmount(amount);
+        stockLogDO.setItemId(itemId);
+        stockLogDO.setStatus(1);
+        stockLogDO.setStockLogId(UUID.randomUUID().toString().replaceAll("-",""));
+
+        stockLogDOMapper.insertSelective(stockLogDO);
+
+        return stockLogDO.getStockLogId();
     }
 
     private ItemModel convertModelFromDataObject(ItemDO itemDO, ItemStockDO itemStockDO){
