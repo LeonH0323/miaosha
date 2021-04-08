@@ -60,15 +60,18 @@ public class PromoServiceImpl implements PromoService {
     @Override
     public void publishPromo(Integer promoId) {
 
-        //通过活动id获取活动
+        // 通过活动id获取活动
         PromoDO promoDO = promoDOMapper.selectByPrimaryKey(promoId);
         if (promoDO == null || promoDO.getItemId().intValue() == 0)
             return;
 
         ItemModel itemModel = itemService.getItemById(promoDO.getItemId());
 
-        //将库存同步到redis内
+        // 将库存同步到redis内
         redisTemplate.opsForValue().set("promo_item_stock_" + itemModel.getId(), itemModel.getStock());
+
+        // 将大闸的限制数字设到redis内
+        redisTemplate.opsForValue().set("promo_door_count_" + promoId, itemModel.getStock().intValue() * 5);
 
     }
 
@@ -93,6 +96,11 @@ public class PromoServiceImpl implements PromoService {
         // 判断用户信息是否存在
         UserModel userModel = userService.getUserByIdInCache(userId);
         if(userModel == null)
+            return null;
+
+        // 获取秒杀大闸的count数量
+        long result = redisTemplate.opsForValue().increment("promo_door_count_" + promoId, -1);
+        if (result < 0)
             return null;
 
         // 生成token并且存入redis内并给一个5分钟的有效期
